@@ -1,7 +1,4 @@
-/Adithyan/NetFixAI_clean/.venv/
-/Backend/myvenv/
-/Adithyan/NetFixAI_clean/backend/venv/
-.env
+
 
 # Environments
 .env
@@ -76,3 +73,7 @@ node_modules/
 npm-debug.log
 yarn-error.log
 yarn-debug.log
+
+/Adithyan/NeuralFix/backend/.venv/
+/Adithyan/NeuralFix/backend/.env
+/Adithyan/NeuralFix/mobile/node_modules/
