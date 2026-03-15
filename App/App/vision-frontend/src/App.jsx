@@ -138,13 +138,24 @@ function InfoCard({ label, value, icon, delay }) {
 }
 
 /* ── Chat Bot ── */
-function ChatBot({ visionContext }) {
+function ChatBot({ visionContext, hasResult }) {
+    const welcomeMsg = hasResult
+        ? 'Equipment analyzed! Ask me anything about the hardware, LED states, or how to fix the issues found.'
+        : '👋 Hi! I\'m your NetFix Technical Assistant. Upload a photo of your router, switch, or modem and I\'ll guide you through diagnosing and fixing any issues. You can also ask me general networking questions right now!'
     const [messages, setMessages] = useState([
-        { role: 'assistant', content: 'Equipment analyzed! Ask me anything about the hardware or how to fix it.' }
+        { role: 'assistant', content: welcomeMsg }
     ])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
     const chatEndRef = useRef(null)
+
+    // Update greeting when analysis result arrives
+    useEffect(() => {
+        if (hasResult && messages.length === 1 && messages[0].role === 'assistant') {
+            setMessages([{ role: 'assistant', content: 'Equipment analyzed! Ask me anything about the hardware, LED states, or how to fix the issues found.' }])
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasResult])
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -164,7 +175,7 @@ function ChatBot({ visionContext }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     messages: next.map(m => ({ role: m.role, content: m.content })),
-                    vision_context: visionContext
+                    vision_context: visionContext ?? {}
                 })
             })
             if (!res.ok) throw new Error('API Error')
@@ -389,8 +400,8 @@ export default function App() {
                 {/* Results */}
                 <ResultPanel data={result} visible={!!result} />
 
-                {/* Chatbot */}
-                {result && !result.error && <ChatBot visionContext={result} />}
+                {/* Chatbot — always visible to guide the user */}
+                <ChatBot visionContext={result ?? {}} hasResult={!!result && !result.error} />
             </main>
 
             <footer className="footer">

@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from functools import lru_cache
 import os
 
 
@@ -8,10 +7,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
 
     # Groq
-    groq_api_key: str = ""
+    groq_api_key: str = "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"
 
-    # Database
-    database_url: str = "postgresql://netfix:netfix123@localhost:5432/netfixai"
+    # Database — defaults to local SQLite so the app works out of the box
+    database_url: str = "sqlite:///./netfix.db"
 
     # Server
     host: str = "0.0.0.0"
@@ -30,6 +29,5 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 
-@lru_cache()
 def get_settings() -> Settings:
     return Settings()

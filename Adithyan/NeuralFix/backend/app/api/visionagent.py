@@ -2,16 +2,18 @@ import ollama
 import base64, json, re
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 from groq import Groq
 from app.core.config import get_settings
 
 router = APIRouter(prefix="/vision", tags=["Vision Agent"])
 
+
 def get_groq_client():
     """Always read fresh settings so API key changes are picked up without restart."""
     s = get_settings()
     return Groq(api_key=s.groq_api_key)
+
 
 PROMPT = """You are a network equipment technician. Look at the image and identify the networking device.
 
@@ -40,24 +42,17 @@ Rules:
 
 def extract_json(raw: str) -> dict:
     """Robustly extract JSON from LLaVA output which may include extra text."""
-    # Strip markdown fences
     cleaned = re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
-
-    # Try direct parse first
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
         pass
-
-    # Find the first {...} block using regex (handles extra text around JSON)
     match = re.search(r'\{[\s\S]*\}', cleaned)
     if match:
         try:
             return json.loads(match.group())
         except json.JSONDecodeError:
             pass
-
-    # If all else fails return an error dict
     return {
         "device_type": "unknown",
         "brand_model": None,
@@ -69,43 +64,35 @@ def extract_json(raw: str) -> dict:
         "error": "JSON parse failed"
     }
 
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-
-class VisionChatRequest(BaseModel):
-    messages: List[ChatMessage]
-    vision_context: Dict[str, Any]
 
 def analyse_image_bytes(image_bytes: bytes) -> dict:
     img_b64 = base64.b64encode(image_bytes).decode("utf-8")
-    
+
     response = ollama.generate(
         model="llava-llama3",
         prompt=PROMPT,
         images=[img_b64],
         stream=False
     )
-    
-    raw = response["response"].strip()
-    print(f"[LLaVA raw output]\n{raw}\n{'─'*60}")  # debug log
 
+    raw = response["response"].strip()
+    print(f"[LLaVA raw output]\n{raw}\n{'─'*60}")
     parsed_json = extract_json(raw)
 
-    # ─── PART 2: Ask Groq for detailed fix steps
-    summary_prompt = f"""You are an expert network technician. 
+    # Ask Groq for a detailed fix guide
+    summary_prompt = f"""You are an expert network technician.
 A physical inspection of the user's network equipment yielded the following findings:
 {json.dumps(parsed_json, indent=2)}
 
-Please provide a highly detailed, step-by-step markdown response explaining exactly how the user can troubleshoot and fix the issues identified. 
-Structure it clearly with headings, bullet points, and any relevant warnings.
+Provide a highly detailed, step-by-step markdown response explaining exactly how the user can troubleshoot and fix the issues found.
+Structure it with headings, bullet points, and relevant warnings.
 """
     try:
         client = get_groq_client()
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": "You are a helpful and expert network support assistant."},
+                {"role": "system", "content": "You are a helpful expert network support assistant."},
                 {"role": "user", "content": summary_prompt}
             ],
             temperature=0.3,
@@ -120,6 +107,17 @@ Structure it clearly with headings, bullet points, and any relevant warnings.
 
     return parsed_json
 
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class VisionChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    vision_context: Dict[str, Any]
+
+
 @router.post("/analyse")
 async def analyse_equipment_image(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
@@ -127,6 +125,7 @@ async def analyse_equipment_image(file: UploadFile = File(...)):
     contents = await file.read()
     result = analyse_image_bytes(contents)
     return result
+
 
 @router.post("/chat")
 async def vision_chat(payload: VisionChatRequest):
@@ -140,7 +139,7 @@ An AI vision model analyzed a photo of their equipment and found:
 Answer the user's questions based on this context and your general networking knowledge. Be concise and helpful.
 """
     else:
-        system_msg = """You are an expert network technician and friendly assistant for NetFix Vision.
+        system_msg = """You are an expert network technician and friendly assistant for NeuralFix Vision.
 The user has not yet uploaded a photo for analysis.
 Help guide them — explain what kinds of devices you can diagnose (routers, switches, modems, access points),
 what to look for in a photo, and answer any general networking questions they have.
@@ -149,7 +148,7 @@ Be friendly, concise, and proactive in offering help.
     api_messages = [{"role": "system", "content": system_msg}]
     for m in payload.messages:
         api_messages.append({"role": m.role, "content": m.content})
-        
+
     try:
         client = get_groq_client()
         completion = client.chat.completions.create(
