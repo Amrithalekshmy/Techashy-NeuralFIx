@@ -327,7 +327,7 @@ export default function App() {
                         <span className="gradient-text">Equipment Instantly</span>
                     </h1>
                     <p className="hero-subtitle">
-                        Drop a photo of your router, switch, or modem. Our hybrid AI pipeline will analyze the hardware and generate a detailed fix guide in seconds.
+                        Drop a photo of your device. Our hybrid AI pipeline will analyze the hardware and generate a detailed fix guide in seconds.
                     </p>
                 </div>
 
